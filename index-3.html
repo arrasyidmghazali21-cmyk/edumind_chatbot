@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EduMind — AI Learning Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0e0f14;
+      --surface: #16181f;
+      --surface2: #1e2029;
+      --border: #2a2d3a;
+      --accent: #f0c040;
+      --accent2: #e8965a;
+      --text: #e8e9ef;
+      --text-muted: #7a7d8e;
+      --user-bubble: #1f2d4a;
+      --bot-bubble: #1a1c24;
+      --green: #56c596;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── NOISE TEXTURE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      height: 64px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo-text {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .logo-text span { color: var(--accent); }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .status-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .clear-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .clear-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    /* ── SUBJECT PILLS ── */
+    .subject-bar {
+      position: relative; z-index: 10;
+      display: flex; gap: 8px; align-items: center;
+      padding: 10px 28px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .subject-bar::-webkit-scrollbar { display: none; }
+
+    .subject-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      white-space: nowrap;
+      margin-right: 4px;
+    }
+
+    .pill {
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .pill:hover, .pill.active {
+      background: var(--accent);
+      color: #0e0f14;
+      border-color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ── CHAT AREA ── */
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 0;
+      position: relative;
+      z-index: 1;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    #chat::-webkit-scrollbar { width: 4px; }
+    #chat::-webkit-scrollbar-track { background: transparent; }
+    #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .chat-inner {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── WELCOME SCREEN ── */
+    #welcome {
+      text-align: center;
+      padding: 48px 20px 20px;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .welcome-icon {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, rgba(240,192,64,0.15), rgba(232,150,90,0.15));
+      border: 1px solid rgba(240,192,64,0.3);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 20px;
+    }
+
+    .welcome-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, var(--text), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .welcome-sub {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+
+    .suggestions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      text-align: left;
+    }
+
+    .suggestion-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .suggestion-card:hover {
+      border-color: var(--accent);
+      background: rgba(240,192,64,0.05);
+      transform: translateY(-1px);
+    }
+
+    .sug-icon { font-size: 18px; margin-bottom: 6px; }
+    .sug-text { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+
+    /* ── MESSAGES ── */
+    .message {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      animation: fadeUp 0.3s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .avatar.bot {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+    }
+
+    .avatar.user {
+      background: var(--user-bubble);
+      border: 1px solid var(--border);
+    }
+
+    .bubble {
+      max-width: 72%;
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      line-height: 1.65;
+      font-size: 14.5px;
+    }
+
+    .message.bot .bubble {
+      background: var(--bot-bubble);
+      border: 1px solid var(--border);
+      border-top-left-radius: 4px;
+      color: var(--text);
+    }
+
+    .message.user .bubble {
+      background: var(--user-bubble);
+      border: 1px solid #2a3d5a;
+      border-top-right-radius: 4px;
+      color: var(--text);
+    }
+
+    .bubble strong { color: var(--accent); }
+    .bubble code {
+      font-family: 'DM Mono', monospace;
+      background: rgba(255,255,255,0.07);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .bubble pre {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin: 10px 0;
+      overflow-x: auto;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+    }
+
+    .bubble ul, .bubble ol {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    .bubble li { margin-bottom: 4px; }
+
+    .timestamp {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-weight: 300;
+    }
+
+    .message.user .timestamp { text-align: right; }
+
+    /* ── TYPING INDICATOR ── */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 14px 18px;
+    }
+
+    .typing-indicator span {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.4;
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); opacity: 0.4; }
+      50% { transform: translateY(-5px); opacity: 1; }
+    }
+
+    /* ── INPUT AREA ── */
+    .input-wrapper {
+      position: relative;
+      z-index: 10;
+      padding: 16px 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .api-key-bar {
+      max-width: 760px;
+      margin: 0 auto 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .api-key-bar input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-family: 'DM Mono', monospace;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .api-key-bar input:focus { border-color: var(--accent); }
+    .api-key-bar input::placeholder { color: var(--text-muted); }
+
+    .api-key-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .save-key-btn {
+      background: var(--accent);
+      color: #0e0f14;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .save-key-btn:hover { opacity: 0.85; }
+
+    .input-box {
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    textarea {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 13px 16px;
+      font-size: 14.5px;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text);
+      resize: none;
+      outline: none;
+      max-height: 140px;
+      line-height: 1.5;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--text-muted); }
+
+    .send-btn {
+      width: 46px; height: 46px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .send-btn:hover { transform: scale(1.05); }
+    .send-btn:active { transform: scale(0.97); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .send-btn svg { fill: #0e0f14; }
+
+    .input-hint {
+      max-width: 760px;
+      margin: 8px auto 0;
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    /* ── ERROR MESSAGE ── */
+    .error-msg {
+      background: rgba(220,60,60,0.1);
+      border: 1px solid rgba(220,60,60,0.3);
+      color: #ff7070;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      max-width: 72%;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      header { padding: 0 16px; }
+      .subject-bar { padding: 8px 16px; }
+      .input-wrapper { padding: 12px 14px; }
+      .suggestions { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🎓</div>
+    <div class="logo-text">Edu<span>Mind</span></div>
+  </div>
+  <div class="header-right">
+    <div class="status-dot"></div>
+    <span class="status-label" id="statusLabel">Siap Membantu</span>
+    <button class="clear-btn" onclick="clearChat()">Hapus Chat</button>
+  </div>
+</header>
+
+<!-- SUBJECT PILLS -->
+<div class="subject-bar">
+  <span class="subject-label">Topik:</span>
+  <button class="pill active" onclick="selectSubject(this, 'Umum')">🌐 Umum</button>
+  <button class="pill" onclick="selectSubject(this, 'Matematika')">📐 Matematika</button>
+  <button class="pill" onclick="selectSubject(this, 'Pemrograman')">💻 Pemrograman</button>
+  <button class="pill" onclick="selectSubject(this, 'Sains')">🔬 Sains</button>
+  <button class="pill" onclick="selectSubject(this, 'Sejarah')">📜 Sejarah</button>
+  <button class="pill" onclick="selectSubject(this, 'Bahasa Inggris')">🇬🇧 Bahasa Inggris</button>
+  <button class="pill" onclick="selectSubject(this, 'Ekonomi')">📊 Ekonomi</button>
+</div>
+
+<!-- CHAT -->
+<div id="chat">
+  <div class="chat-inner" id="chatInner">
+    <!-- Welcome -->
+    <div id="welcome">
+      <div class="welcome-icon">🤖</div>
+      <div class="welcome-title">Halo! Aku EduMind</div>
+      <div class="welcome-sub">
+        Asisten belajar AI yang siap membantumu memahami pelajaran apa pun.<br/>
+        Tanya apa saja — dari matematika, sains, coding, hingga sejarah!
+      </div>
+      <div class="suggestions">
+        <div class="suggestion-card" onclick="sendSuggestion('Jelaskan konsep machine learning dengan bahasa sederhana')">
+          <div class="sug-icon">🧠</div>
+          <div class="sug-text">Jelaskan konsep machine learning dengan bahasa sederhana</div>
+        </div>
+        <div class="suggestion-card" onclick="sendSuggestion('Bantu aku belajar Python dari awal')">
+          <div class="sug-icon">🐍</div>
+          <div class="sug-text">Bantu aku belajar Python dari awal</div>
+        </div>
+        <div class="suggestion-card" onclick="sendSuggestion('Apa itu integral dan bagaimana cara menghitungnya?')">
+          <div class="sug-icon">📐</div>
+          <div class="sug-text">Apa itu integral dan cara menghitungnya?</div>
+        </div>
+        <div class="suggestion-card" onclick="sendSuggestion('Koreksi grammar Inggrisku: I have went to school yesterday')">
+          <div class="sug-icon">✍️</div>
+          <div class="sug-text">Koreksi grammar: "I have went to school yesterday"</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- INPUT -->
+<div class="input-wrapper">
+  <!-- API Key Bar -->
+  <div class="api-key-bar">
+    <span class="api-key-label">🔑 Gemini API Key:</span>
+    <input type="password" id="apiKeyInput" placeholder="Paste API Key kamu di sini (AIza...)" />
+    <button class="save-key-btn" onclick="saveApiKey()">Simpan</button>
+  </div>
+
+  <div class="input-box">
+    <textarea
+      id="userInput"
+      rows="1"
+      placeholder="Tanya apa saja kepada EduMind..."
+      onkeydown="handleKey(event)"
+      oninput="autoResize(this)"
+    ></textarea>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Kirim">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+  <div class="input-hint">⏎ Enter untuk kirim &nbsp;·&nbsp; Shift+Enter untuk baris baru &nbsp;·&nbsp; Powered by Gemini 2.0 Flash Lite</div>
+</div>
+
+<script>
+  // ── STATE ──
+  let apiKey = localStorage.getItem('edumind_apikey') || '';
+  let conversationHistory = [];
+  let currentSubject = 'Umum';
+  let isLoading = false;
+
+  const SYSTEM_PROMPT = `Kamu adalah EduMind, asisten belajar AI yang cerdas, ramah, dan sabar. 
+
+Karakteristikmu:
+- Menggunakan bahasa Indonesia yang santai tapi tetap informatif
+- Menjelaskan konsep dengan analogi yang mudah dipahami
+- Selalu memberikan contoh konkret
+- Jika ada soal, tunjukkan langkah-langkah penyelesaiannya secara rinci
+- Menyemangati pengguna ketika mereka belajar
+- Jika ditanya di luar topik edukasi, tetap jawab dengan sopan namun arahkan kembali ke konteks belajar
+- Gunakan emoji sesekali agar terasa lebih hidup 🎯
+- Format jawaban dengan rapi (gunakan poin-poin jika perlu)
+
+Topik yang sedang difokuskan: {SUBJECT}
+
+Selalu akhiri jawaban yang kompleks dengan "💡 Ada yang ingin kamu tanyakan lebih lanjut?"`;
+
+  // ── INIT ──
+  if (apiKey) {
+    document.getElementById('apiKeyInput').value = apiKey;
+    document.getElementById('apiKeyInput').placeholder = '✓ API Key tersimpan';
+  }
+
+  // ── SAVE API KEY ──
+  function saveApiKey() {
+    const val = document.getElementById('apiKeyInput').value.trim();
+    if (!val) return alert('Masukkan API key terlebih dahulu!');
+    apiKey = val;
+    localStorage.setItem('edumind_apikey', val);
+    document.getElementById('apiKeyInput').placeholder = '✓ API Key tersimpan';
+    document.getElementById('apiKeyInput').value = val;
+    showToast('✓ API Key disimpan!');
+  }
+
+  // ── SELECT SUBJECT ──
+  function selectSubject(el, subject) {
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    currentSubject = subject;
+  }
+
+  // ── AUTO RESIZE TEXTAREA ──
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  }
+
+  // ── HANDLE ENTER ──
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  // ── SEND SUGGESTION ──
+  function sendSuggestion(text) {
+    document.getElementById('userInput').value = text;
+    sendMessage();
+  }
+
+  // ── SEND MESSAGE ──
+  async function sendMessage() {
+    const input = document.getElementById('userInput');
+    const text = input.value.trim();
+    if (!text || isLoading) return;
+
+    if (!apiKey) {
+      alert('⚠️ Masukkan Gemini API Key terlebih dahulu di kolom atas!');
+      return;
+    }
+
+    // Hide welcome
+    const welcome = document.getElementById('welcome');
+    if (welcome) welcome.remove();
+
+    // Add user message
+    addMessage('user', text);
+    input.value = '';
+    input.style.height = 'auto';
+
+    // Add to history
+    conversationHistory.push({ role: 'user', parts: [{ text }] });
+
+    // Show typing
+    const typingId = showTyping();
+    setLoading(true);
+
+    try {
+      const systemText = SYSTEM_PROMPT.replace('{SUBJECT}', currentSubject);
+
+      // Build contents with system turn as first user message
+      const contents = [];
+      if (conversationHistory.length === 1) {
+        contents.push({
+          role: 'user',
+          parts: [{ text: systemText + '\n\nPesan pertama pengguna: ' + text }]
+        });
+      } else {
+        contents.push({
+          role: 'user',
+          parts: [{ text: systemText + '\n\nMulai percakapan.' }]
+        });
+        contents.push({
+          role: 'model',
+          parts: [{ text: 'Halo! Aku EduMind, asisten belajarmu. 🎓 Siap membantu kamu belajar! Ada yang ingin kamu tanyakan?' }]
+        });
+        for (const msg of conversationHistory) {
+          contents.push(msg);
+        }
+      }
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.9,
+              maxOutputTokens: 1500,
+            },
+            safetySettings: [
+              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            ]
+          })
+        }
+      );
+
+      const data = await response.json();
+      removeTyping(typingId);
+
+      if (data.error) {
+        addError(data.error.message || 'Terjadi kesalahan pada API');
+      } else {
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Maaf, aku tidak bisa merespons saat ini.';
+        conversationHistory.push({ role: 'model', parts: [{ text: reply }] });
+        addMessage('bot', reply);
+      }
+
+    } catch (err) {
+      removeTyping(typingId);
+      addError('Gagal terhubung ke Gemini API. Periksa API key dan koneksi internet kamu.');
+    }
+
+    setLoading(false);
+  }
+
+  // ── ADD MESSAGE ──
+  function addMessage(role, text) {
+    const inner = document.getElementById('chatInner');
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+
+    const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    const avatarEmoji = role === 'bot' ? '🤖' : '👤';
+    const formattedText = formatText(text);
+
+    div.innerHTML = `
+      <div class="avatar ${role}">${avatarEmoji}</div>
+      <div>
+        <div class="bubble">${formattedText}</div>
+        <div class="timestamp">${now}</div>
+      </div>
+    `;
+
+    inner.appendChild(div);
+    scrollToBottom();
+  }
+
+  // ── FORMAT TEXT ──
+  function formatText(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      // Code blocks
+      .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+      // Inline code
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      // Bold
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      // Headers
+      .replace(/^### (.+)$/gm, '<strong style="font-size:15px;display:block;margin:10px 0 4px;">$1</strong>')
+      .replace(/^## (.+)$/gm, '<strong style="font-size:16px;display:block;margin:12px 0 6px;">$1</strong>')
+      // Bullet points
+      .replace(/^[•\-] (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+      // Numbered list
+      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+      // Line breaks
+      .replace(/\n/g, '<br/>');
+  }
+
+  // ── SHOW TYPING ──
+  function showTyping() {
+    const inner = document.getElementById('chatInner');
+    const id = 'typing-' + Date.now();
+    const div = document.createElement('div');
+    div.className = 'message bot';
+    div.id = id;
+    div.innerHTML = `
+      <div class="avatar bot">🤖</div>
+      <div class="bubble bot-bubble">
+        <div class="typing-indicator">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    `;
+    inner.appendChild(div);
+    scrollToBottom();
+    return id;
+  }
+
+  function removeTyping(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  // ── ADD ERROR ──
+  function addError(msg) {
+    const inner = document.getElementById('chatInner');
+    const div = document.createElement('div');
+    div.className = 'message bot';
+    div.innerHTML = `
+      <div class="avatar bot">🤖</div>
+      <div class="error-msg">⚠️ ${msg}</div>
+    `;
+    inner.appendChild(div);
+    scrollToBottom();
+  }
+
+  // ── CLEAR CHAT ──
+  function clearChat() {
+    conversationHistory = [];
+    const inner = document.getElementById('chatInner');
+    inner.innerHTML = `
+      <div id="welcome">
+        <div class="welcome-icon">🤖</div>
+        <div class="welcome-title">Halo! Aku EduMind</div>
+        <div class="welcome-sub">
+          Asisten belajar AI yang siap membantumu memahami pelajaran apa pun.<br/>
+          Tanya apa saja — dari matematika, sains, coding, hingga sejarah!
+        </div>
+        <div class="suggestions">
+          <div class="suggestion-card" onclick="sendSuggestion('Jelaskan konsep machine learning dengan bahasa sederhana')">
+            <div class="sug-icon">🧠</div>
+            <div class="sug-text">Jelaskan konsep machine learning dengan bahasa sederhana</div>
+          </div>
+          <div class="suggestion-card" onclick="sendSuggestion('Bantu aku belajar Python dari awal')">
+            <div class="sug-icon">🐍</div>
+            <div class="sug-text">Bantu aku belajar Python dari awal</div>
+          </div>
+          <div class="suggestion-card" onclick="sendSuggestion('Apa itu integral dan bagaimana cara menghitungnya?')">
+            <div class="sug-icon">📐</div>
+            <div class="sug-text">Apa itu integral dan cara menghitungnya?</div>
+          </div>
+          <div class="suggestion-card" onclick="sendSuggestion('Koreksi grammar Inggrisku: I have went to school yesterday')">
+            <div class="sug-icon">✍️</div>
+            <div class="sug-text">Koreksi grammar: "I have went to school yesterday"</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── HELPERS ──
+  function scrollToBottom() {
+    const chat = document.getElementById('chat');
+    setTimeout(() => chat.scrollTop = chat.scrollHeight, 50);
+  }
+
+  function setLoading(val) {
+    isLoading = val;
+    document.getElementById('sendBtn').disabled = val;
+    document.getElementById('statusLabel').textContent = val ? 'Sedang berpikir...' : 'Siap Membantu';
+  }
+
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    Object.assign(t.style, {
+      position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
+      background: 'var(--accent)', color: '#0e0f14', padding: '8px 20px',
+      borderRadius: '20px', fontSize: '13px', fontWeight: '600', zIndex: '999',
+      animation: 'fadeUp 0.3s ease'
+    });
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+  }
+</script>
+</body>
+</html>
